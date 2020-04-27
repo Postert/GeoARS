@@ -1,133 +1,179 @@
-﻿using UnityEngine;
-using UnityEngine.UI;
+﻿using System.Collections; 
+using System.Collections.Generic;
+using Unity.Mathematics;
 
-public class Annotation : MonoBehaviour
+
+public abstract class Annotation
 {
-    public bool IsLookingToARCamera = false;
-    public bool IsScalingWithARCameraDistance = false;
+    public AnnotationProperties AnnotationProperties { get; set; }
 
+    public Annotation(AnnotationProperties annotationProperties) =>
+        (AnnotationProperties) = (annotationProperties);
 
-    private GameObject AnnotationGameObject;
-    private Canvas AnnotationCanvas;
-    private Text TextComponent;
-    private GameObject TextField;
-    private CanvasScaler AnnotationCanvasScaler;
-    private GraphicRaycaster AnnotationGraphicRaycaster;
+    public Annotation(bool scaleWithCameraDistance, bool scaleBySelection, float3 pointingDirection) => 
+        (AnnotationProperties) = (new AnnotationProperties(scaleWithCameraDistance, scaleBySelection, pointingDirection));
 
-    private Vector3 AnnotationPosition;
-    private const int FontSize = 25;
-    private RectTransform RectTransform;
-    private Vector3 RectTransformScaleOneMeterDistance;
-
-
-
-    public void SetLookToARCamera(bool isLookingToARCamera)
+    public override string ToString()
     {
-        IsLookingToARCamera = isLookingToARCamera;
-        this.Rename();
+        return AnnotationProperties.ToString();
     }
+}
 
-    public bool GetLookToARCamera() { return IsLookingToARCamera; }
+public class AnnotationProperties
+{
+    public bool ScaleWithCameraDistance { get; set; }
+    public bool ScaleBySelection { get; set; }
+    public float3 PointingDirection { get; set; }
 
+    public AnnotationProperties(bool scaleWithCameraDistance, bool scaleBySelection, float3 pointingDirection) =>
+        (ScaleWithCameraDistance, ScaleBySelection, PointingDirection) =
+        (scaleWithCameraDistance, scaleBySelection, pointingDirection);
 
-    public void SetScaleWithARCameraDistance(bool isScalingWithARCameraDistance)
+    public override string ToString()
     {
-        IsScalingWithARCameraDistance = isScalingWithARCameraDistance;
-        this.Rename();
+        return "\n--AnnotationProperties----------------------------------"
+            + "\nScaleWithCameraDistance: " + ScaleWithCameraDistance
+            + "\nScaleBySelection: " + ScaleBySelection
+            + "\nPointingDirection " + PointingDirection;
     }
+}
 
-    public bool GetScaleithARCameraDistance() { return IsScalingWithARCameraDistance; }
+
+/*
+public class SimpleTextAnnotation
+{
+    public AnnotationTextComponent TextAnnotationComponent { get; set; }
+
+    public SimpleTextAnnotation(, string annotationText, float localScale) :
+        this(scaleWithCameraDistance, scaleBySelection, pointingDirection, new AnnotationTextComponent(annotationText, localScale)) {}
+
+    public SimpleTextAnnotation(AnnotationTextComponent textAnnotationComponent)
+}
+*/
 
 
-    public void Rename()
+public class AnnotationComponent { }
+
+public class TextAnnotationComponent : AnnotationComponent
+{
+    public string Text { get; set; }
+    public float TextSize { get; set; }
+
+
+    public TextAnnotationComponent(string text, float textSize) => 
+        (Text, TextSize) = (text, textSize);
+
+    public override string ToString()
     {
-        name = (IsLookingToARCamera) ? "ARCameraOrientatedAnnatation" : "FixedOrietatedAnnotation";
-        name += (IsScalingWithARCameraDistance) ? "WithAutoScaling" : "WithFixedScaling";
+        return "\n--AnnotationTextComponent----------------------------------"
+            + "\nText: " + Text
+            + "\nLocalScale: " + TextSize;
     }
+}
 
 
-    public void SetAnnotationText(string annotationText)
+public class BuildingAnnotation : Annotation
+{
+    public const int meterAboveBuilding = 1;
+
+    /// <summary>
+    /// Core component for anchoraging the BuildingAnnotation
+    /// </summary>
+    public Building AssociatedBuilding { get; set; }
+
+    public AnnotationComponent AnnotationComponent { get; set; }
+
+    public BuildingAnnotation(Building associatedBuilding, AnnotationComponent annotationComponent, AnnotationProperties annotationProperties) :
+        this(associatedBuilding, annotationComponent, annotationProperties.ScaleWithCameraDistance, annotationProperties.ScaleBySelection, annotationProperties.PointingDirection)
+    { }
+
+    public BuildingAnnotation(Building associatedBuilding, AnnotationComponent annotationComponent, bool scaleWithCameraDistance, bool scaleBySelection, float3 pointingDirection)  :
+        base(scaleWithCameraDistance, scaleBySelection, pointingDirection) =>
+        (AssociatedBuilding, AnnotationComponent) = (associatedBuilding, annotationComponent);
+
+    public override string ToString()
     {
-        TextComponent.text = annotationText;
+        return "BuildingAnnotation associated to building " + AssociatedBuilding.CityGMLID
+            + base.ToString()
+            + AnnotationComponent.ToString()
+            + "\n--associated Building----------------------------------"
+            + "\n\n";
     }
+}
 
-    public void SetLocalScale(float localScale)
+
+public class SurfaceAnnotation : Annotation
+{
+    public const float SurfaceOffset = 0.01f;
+
+    /// <summary>
+    /// Core component for anchoraging the SurfaceAnnotation
+    /// </summary>
+    public Surface AssociatedSurface { get; set; }
+
+
+// TODO: Ankerpunkte durch Referenzierung der Double Werte aus 
+    /// <summary>
+    /// Indexes of two adjacent points of the AssociatedSurface's polygon for positioning the SurfaceAnnotation in between
+    /// </summary>
+    public int AnnotationAnchorPointIndex { get; set; }
+
+    /// <summary>
+    /// Double for relative placement between two adjacent points of the surface polygon specified by the AnnotationAnchorPointIndexes
+    /// </summary>
+    public double RelativePositionBetweenBasePoints { get; set; }
+
+    /// <summary>
+    /// Distance of the anchoring of the surface annotation perpendicular to the base line spanned by two points of the AssociatedSurface's polygon and perpendicular to the Surface's normal vector. 
+    /// </summary>
+    public double HeightAboveBaseLine { get; set; }
+
+    public AnnotationComponent AnnotationComponent { get; set; }
+
+    public SurfaceAnnotation(Surface associatedSurface, int annotationAnchorPointIndex, double relativePositionBetweenBasePoints, double heightAboveBaseLine, AnnotationComponent annotationComponent, AnnotationProperties annotationProperties) :
+        this(associatedSurface, annotationAnchorPointIndex, relativePositionBetweenBasePoints, heightAboveBaseLine, annotationComponent, annotationProperties.ScaleWithCameraDistance, annotationProperties.ScaleBySelection, annotationProperties.PointingDirection)
+    { }
+
+    public SurfaceAnnotation(Surface associatedSurface, int annotationAnchorPointIndex, double relativePositionBetweenBasePoints, double heightAboveBaseLine, AnnotationComponent annotationComponent, bool scaleWithCameraDistance, bool scaleBySelection, float3 pointingDirection) :
+        base(scaleWithCameraDistance, scaleBySelection, pointingDirection) =>
+        (AssociatedSurface, AnnotationAnchorPointIndex, RelativePositionBetweenBasePoints, HeightAboveBaseLine, AnnotationComponent) = (associatedSurface, annotationAnchorPointIndex, relativePositionBetweenBasePoints, heightAboveBaseLine, annotationComponent);
+
+    public override string ToString()
     {
-        RectTransform.localScale = new Vector3(localScale, localScale, localScale);
+        return "SurfaceAnnotation associated to surface " + AssociatedSurface.CityGMLID
+            + base.ToString()
+            + AnnotationComponent.ToString()
+            + "\nwith AnnotationAnchorPointIndex " + AnnotationAnchorPointIndex
+            + "\nwith RelativePositionBetweenBasePoints " + RelativePositionBetweenBasePoints
+            + "\nwith HeightAboveBaseLine " + HeightAboveBaseLine
+            + "\n\n";
     }
+}
 
 
 
-    // Start is called before the first frame update
-    void Awake()
+public class WorldCoordinateAnnotation : Annotation
+{
+    /// <summary>
+    /// Core component for anchoraging the SurfaceAnnotation
+    /// </summary>
+    public double3 AnnotationUMLCoordinates { get; set; }
+
+    public AnnotationComponent AnnotationComponent { get; set; }
+
+    public WorldCoordinateAnnotation(double3 realWorldCoordinates, AnnotationComponent annotationComponent, AnnotationProperties annotationProperties) :
+        this(realWorldCoordinates, annotationComponent, annotationProperties.ScaleWithCameraDistance, annotationProperties.ScaleBySelection, annotationProperties.PointingDirection)
+    { }
+
+    public WorldCoordinateAnnotation(double3 realWorldCoordinates, AnnotationComponent annotationTextComponent, bool scaleWithCameraDistance, bool scaleBySelection, float3 pointingDirection) :
+        base(scaleWithCameraDistance, scaleBySelection, pointingDirection) =>
+        (AnnotationUMLCoordinates, AnnotationComponent) = (realWorldCoordinates, annotationTextComponent);
+
+    public override string ToString()
     {
-        this.Rename();
-        AnnotationGameObject = new GameObject();
-
-        RectTransformScaleOneMeterDistance = new Vector3(0.01f, 0.01f, 1f);
-
-        // Initialize Annotation with Canvas
-        AnnotationCanvas = AnnotationGameObject.AddComponent<Canvas>();
-        AnnotationCanvas.renderMode = RenderMode.WorldSpace;
-        AnnotationCanvasScaler = AnnotationGameObject.AddComponent<CanvasScaler>();
-        AnnotationCanvasScaler.scaleFactor = 10.0f;
-        AnnotationCanvasScaler.dynamicPixelsPerUnit = 50f;
-        AnnotationGraphicRaycaster = AnnotationGameObject.AddComponent<GraphicRaycaster>();
-        AnnotationGameObject.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 3.0f);
-        AnnotationGameObject.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 3.0f);
-
-
-        AnnotationGameObject.name = "Annotation";
-        bool bWorldPosition = false;
-
-        AnnotationGameObject.GetComponent<RectTransform>().SetParent(transform, bWorldPosition);
-        AnnotationGameObject.transform.localPosition = new Vector3(0f, 0f, 0f);
-        AnnotationGameObject.transform.localScale = new Vector3(1, 1, 1);
-        // 1.0f / this.transform.localScale.x * 0.1f,
-        // 1.0f / this.transform.localScale.y * 0.1f,
-        // 1.0f / this.transform.localScale.z * 0.1f);
-
-        // Initialize Canvas with text component
-        TextField = new GameObject();
-        TextField.name = "Text";
-        TextField.transform.parent = AnnotationGameObject.transform;
-        TextComponent = TextField.AddComponent<Text>();
-
-        RectTransform = TextField.GetComponent<RectTransform>();
-        RectTransform.localScale = RectTransformScaleOneMeterDistance;
-        RectTransform.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 3.0f);
-        RectTransform.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 3.0f);
-
-        TextComponent.alignment = TextAnchor.MiddleCenter;
-        TextComponent.horizontalOverflow = HorizontalWrapMode.Overflow;
-        TextComponent.verticalOverflow = VerticalWrapMode.Overflow;
-        Font ArialFont = (Font)Resources.GetBuiltinResource(typeof(Font), "Arial.ttf");
-        TextComponent.font = ArialFont;
-        TextComponent.fontSize = FontSize;
-        TextComponent.text = "";
-        TextComponent.enabled = true;
-        TextComponent.color = Color.white;
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        Vector3 cameraPosition = Camera.main.transform.position;
-
-        if (GetLookToARCamera())
-        {
-            // Face the camera directly.
-            transform.LookAt(cameraPosition);
-
-            // Rotate so the visible side faces the camera.
-            transform.Rotate(0, 180, 0);
-        }
-
-        if (GetScaleithARCameraDistance())
-        {
-            // Scale annotation for keeping the same size by calculating the scale depending on the distance of the AR camera to the annotation
-            float annotationCameraDistance = Vector3.Distance(cameraPosition, AnnotationGameObject.transform.position);
-            RectTransform.localScale = RectTransformScaleOneMeterDistance * annotationCameraDistance;
-        }
+        return "WorldCoordinateAnnotation associated to coordinate " + AnnotationUMLCoordinates.ToString()
+            + base.ToString()
+            + AnnotationComponent.ToString()
+            + "\n\n";
     }
 }

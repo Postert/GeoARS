@@ -1,0 +1,117 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 848409ee8ba454f42a5ddff137688a27, type: 3}
+  m_Name: ReferenceImageLibrary
+  m_EditorClassIdentifier: 
+  m_GuidLow: 5517135310806210326
+  m_GuidHigh: 10281123081913522831
+  m_Images:
+  - m_SerializedGuid:
+      m_GuidLow: 5053343031218702949
+      m_GuidHigh: 1105065073917606328
+    m_SerializedTextureGuid:
+      m_GuidLow: 1991737409278039321
+      m_GuidHigh: 14099334191994408170
+    m_Size: {x: 0.2, y: 0.2}
+    m_SpecifySize: 1
+    m_Name: ar_marker0
+    m_Texture: {fileID: 0}
+  - m_SerializedGuid:
+      m_GuidLow: 5018546660365064706
+      m_GuidHigh: 1143713857251995283
+    m_SerializedTextureGuid:
+      m_GuidLow: 8256427715240873763
+      m_GuidHigh: 7009649181712371753
+    m_Size: {x: 0.2, y: 0.2}
+    m_SpecifySize: 1
+    m_Name: ar_marker1
+    m_Texture: {fileID: 0}
+  - m_SerializedGuid:
+      m_GuidLow: 5243944547436645716
+      m_GuidHigh: 2523214966713131165
+    m_SerializedTextureGuid:
+      m_GuidLow: 8765353484957185449
+      m_GuidHigh: 5514848001649892505
+    m_Size: {x: 0.2, y: 0.2}
+    m_SpecifySize: 1
+    m_Name: ar_marker2
+    m_Texture: {fileID: 0}
+  - m_SerializedGuid:
+      m_GuidLow: 4839090971592373290
+      m_GuidHigh: 1130990916011572612
+    m_SerializedTextureGuid:
+      m_GuidLow: 4419360163416912516
+      m_GuidHigh: 10506626021745677801
+    m_Size: {x: 0.2, y: 0.2}
+    m_SpecifySize: 1
+    m_Name: ar_marker3
+    m_Texture: {fileID: 0}
+  - m_SerializedGuid:
+      m_GuidLow: 4862420425163725694
+      m_GuidHigh: 4885357267495688073
+    m_SerializedTextureGuid:
+      m_GuidLow: 4041042303936908324
+      m_GuidHigh: 5519482987960132520
+    m_Size: {x: 0.2, y: 0.2}
+    m_SpecifySize: 1
+    m_Name: ar_marker4
+    m_Texture: {fileID: 0}
+  - m_SerializedGuid:
+      m_GuidLow: 4880290038587301904
+      m_GuidHigh: 18380231105651176614
+    m_SerializedTextureGuid:
+      m_GuidLow: 17682327575835872595
+      m_GuidHigh: 16722446049649931352
+    m_Size: {x: 0.287, y: 0.287}
+    m_SpecifySize: 1
+    m_Name: ar_marker5
+    m_Texture: {fileID: 0}
+  - m_SerializedGuid:
+      m_GuidLow: 4748058188637701605
+      m_GuidHigh: 10358583596137057947
+    m_SerializedTextureGuid:
+      m_GuidLow: 16380984628822415428
+      m_GuidHigh: 4370199669722669240
+    m_Size: {x: 0.287, y: 0.287}
+    m_SpecifySize: 1
+    m_Name: ar_marker6
+    m_Texture: {fileID: 0}
+  - m_SerializedGuid:
+      m_GuidLow: 4642751831406729088
+      m_GuidHigh: 1205860902425459851
+    m_SerializedTextureGuid:
+      m_GuidLow: 16317818132479270189
+      m_GuidHigh: 1407288664366280666
+    m_Size: {x: 0.287, y: 0.287}
+    m_SpecifySize: 1
+    m_Name: ar_marker7
+    m_Texture: {fileID: 0}
+  - m_SerializedGuid:
+      m_GuidLow: 4914659167671051131
+      m_GuidHigh: 17258344594451564428
+    m_SerializedTextureGuid:
+      m_GuidLow: 8499545353970855944
+      m_GuidHigh: 11980806174923846619
+    m_Size: {x: 0.287, y: 0.287}
+    m_SpecifySize: 1
+    m_Name: ar_marker8
+    m_Texture: {fileID: 0}
+  - m_SerializedGuid:
+      m_GuidLow: 4974008126930509911
+      m_GuidHigh: 3117256991545100418
+    m_SerializedTextureGuid:
+      m_GuidLow: 8977061796649952185
+      m_GuidHigh: 17000951864813527304
+    m_Size: {x: 0.287, y: 0.287}
+    m_SpecifySize: 1
+    m_Name: ar_marker9
+    m_Texture: {fileID: 0}

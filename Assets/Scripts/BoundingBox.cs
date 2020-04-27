@@ -2,23 +2,31 @@
 using System.Collections.Generic;
 using Unity.Mathematics;
 
+
+
+
 /// <summary>
 /// Contains the 3D points of the cuboid bounding box that best enclose the data set and the derived center point on the projected x-y plane
 /// </summary>
 public class BoundingBox
 {
-    private double3 Origin = new double3(0,0,0);
+    public double3? ButtomLowerLeftCorner { get; private set; }
+    public double3? TopUpperRightCorner { get; private set; }
 
-    public double3 ButtomLowerLeftCorner { get; private set; }
-    public double3 TopUpperRightCorner { get; private set; }
-
-    private bool isInitialized = false;
+    /// <summary>
+    /// Resetting the BoudingBox by deleting the spanning points. Existing information of the BoundingBox cannot be restored.
+    /// </summary>
+    public void Clear()
+    {
+        this.ButtomLowerLeftCorner = null;
+        this.TopUpperRightCorner = null;
+    }
 
 
     public BoundingBox()
     {
-        this.ButtomLowerLeftCorner = Origin;
-        this.TopUpperRightCorner = Origin;
+        this.ButtomLowerLeftCorner = null;
+        this.TopUpperRightCorner = null;
     }
 
     public BoundingBox(double3 ButtomLowerLeftCorner, double3 TopUpperRightCorner)
@@ -28,21 +36,25 @@ public class BoundingBox
     }
 
 
+    /// <summary>
+    /// Updates BoundingBox with a single point of type doube3
+    /// </summary>
+    /// <param name="point">Point to update the BoudingBoy with</param>
     private void UpdateWith(double3 point)
     {
-        if (!isInitialized)
+        if (!this.ButtomLowerLeftCorner.HasValue || !this.TopUpperRightCorner.HasValue)
         {
             ButtomLowerLeftCorner = point;
             TopUpperRightCorner = point;
         }
         else
         {
-            double buttomLowerLeftCorner_X = Math.Min(this.ButtomLowerLeftCorner.x, point.x);
-            double buttomLowerLeftCorner_Y = Math.Min(this.ButtomLowerLeftCorner.y, point.y);
-            double buttomLowerLeftCorner_Z = Math.Min(this.ButtomLowerLeftCorner.z, point.z);
-            double topUpperRightCorner_X = Math.Max(this.TopUpperRightCorner.x, point.x);
-            double topUpperRightCorner_Y = Math.Max(this.TopUpperRightCorner.y, point.y);
-            double topUpperRightCorner_Z = Math.Max(this.TopUpperRightCorner.z, point.z);
+            double buttomLowerLeftCorner_X = Math.Min(this.ButtomLowerLeftCorner.Value.x, point.x);
+            double buttomLowerLeftCorner_Y = Math.Min(this.ButtomLowerLeftCorner.Value.y, point.y);
+            double buttomLowerLeftCorner_Z = Math.Min(this.ButtomLowerLeftCorner.Value.z, point.z);
+            double topUpperRightCorner_X = Math.Max(this.TopUpperRightCorner.Value.x, point.x);
+            double topUpperRightCorner_Y = Math.Max(this.TopUpperRightCorner.Value.y, point.y);
+            double topUpperRightCorner_Z = Math.Max(this.TopUpperRightCorner.Value.z, point.z);
 
             ButtomLowerLeftCorner = new double3(
                 buttomLowerLeftCorner_X,
@@ -55,58 +67,96 @@ public class BoundingBox
                 topUpperRightCorner_Z
                 );
         }
-
-        isInitialized = true;
     }
 
-
-    public void UpdateWith(double3 point, bool resetBoudingBox)
+    /// <summary>
+    /// Updates BoundingBox with a list of points of type doube3
+    /// </summary>
+    /// <param name="points">List of points to update the BoudingBox with</param>
+    public void UpdateWith(List<double3> points)
     {
-        isInitialized = !resetBoudingBox;
-        if (resetBoudingBox == true)
-            isInitialized = false;
-        this.UpdateWith(point);
-    }
-
-
-    public void UpdateWith(List<double3> pointList, bool resetBoudingBox)
-    {
-        isInitialized = !resetBoudingBox;
-        foreach (double3 point in pointList)
+        foreach (double3 point in points)
         {
             this.UpdateWith(point);
         }
     }
 
-    public void UpdateWith(double3[] pointArray, bool resetBoudingBox)
+    /// <summary>
+    /// Updates BoudingBox with an array of points of the type double3
+    /// </summary>
+    /// <param name="points">Array with points to update the BoudingBox</param>
+    public void UpdateWith(double3[] points)
     {
-        isInitialized = !resetBoudingBox;
-        foreach (double3 point in pointArray)
+        foreach (double3 point in points)
         {
             this.UpdateWith(point);
         }
     }
+
+    /// <summary>
+    /// Updates BoudingBox with a list of surfaces which are spanned by polygons of points of the type double3
+    /// </summary>
+    /// <param name="surfaces">Surface with </param>
+    public void UpdateWith(List<Surface> surfaces)
+    {
+        foreach (Surface surface in surfaces)
+        {
+            this.UpdateWith(surface);
+        }
+    }
+
+    public void UpdateWith(Surface surface)
+    {
+        foreach (double3 point in surface.Polygon)
+        {
+            this.UpdateWith(point);
+        }
+    }
+
 
     public void UpdateWith(BoundingBox boundingBox)
     {
-        isInitialized = false;
-        this.UpdateWith(boundingBox.ButtomLowerLeftCorner);
-        this.UpdateWith(boundingBox.TopUpperRightCorner);
+        if (boundingBox.ButtomLowerLeftCorner.HasValue && boundingBox.TopUpperRightCorner.HasValue)
+        {
+            this.UpdateWith(boundingBox.ButtomLowerLeftCorner.Value);
+            this.UpdateWith(boundingBox.TopUpperRightCorner.Value);
+        }
     }
 
-
-    public double2 GetGroundSurfaceCenter()
+    /// <summary>
+    /// Returns the center of the bouding box
+    /// </summary>
+    /// <returns></returns>
+    public double3? GetGroundSurfaceCenter()
     {
-        return new double2(
-            ButtomLowerLeftCorner.x + 0.5 * (TopUpperRightCorner.x - ButtomLowerLeftCorner.x),
-            ButtomLowerLeftCorner.y + 0.5 * (TopUpperRightCorner.y - ButtomLowerLeftCorner.y)
-            );
+        if (this.IsInitialized())
+        {
+            return new double3(
+                ButtomLowerLeftCorner.Value.x + 0.5 * (TopUpperRightCorner.Value.x - ButtomLowerLeftCorner.Value.x),
+                ButtomLowerLeftCorner.Value.y + 0.5 * (TopUpperRightCorner.Value.y - ButtomLowerLeftCorner.Value.y),
+                ButtomLowerLeftCorner.Value.z + 0.5 * (TopUpperRightCorner.Value.z - ButtomLowerLeftCorner.Value.z)
+                );
+        }
+        else
+        {
+            return null;
+        }
     }
 
-
-    public bool HasContent()
+    /// <summary>
+    /// Returns true if both points that span the BoundungBox have been initialized and are not identical. Otherwise false is returned. 
+    /// </summary>
+    /// <returns></returns>
+    public bool IsInitialized()
     {
-        return !ButtomLowerLeftCorner.Equals(TopUpperRightCorner);
+        if (!this.ButtomLowerLeftCorner.HasValue || !this.TopUpperRightCorner.HasValue)
+        {
+            return false;
+        }
+        else
+        {
+            return !ButtomLowerLeftCorner.Equals(TopUpperRightCorner);
+        }
     }
 
 

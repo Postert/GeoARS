@@ -5,85 +5,104 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class AnnotationManager : CityGMLFactory
+
+
+
+public class AnnotationManager : MonoBehaviour //CityGMLObjectManager
 {
     public GameObject AnnotationPrefab;
-    private DatabaseService _DatabaseService;
+    public DatabaseService DatabaseService { get; set; }
 
-    private const int boudingBoxDimension = 300;
+    private const int boundingBoxDimension = 300;
 
 
     private void Awake()
     {
-        _DatabaseService = GameObject.Find("AR Session Origin").GetComponent<TargetDetector>()._DatabaseService;
+        DatabaseService = GameObject.Find("AR Session Origin").GetComponent<TargetDetector>().DatabaseService;
     }
-    
 
 
-    public override void CreateGameObjectsAroundTarget(double3 targetRealWorldCoordinates)
+
+    public void CreateGameObjectsAroundTarget(double3 targetUMLCoordinates, Dictionary<string, Building> buildingsWithinBoundingBox)
     {
-        Debug.Log(MyTimer.GetSecondsSiceStartAsString() + ": Generating BoundinBox around detected target");
-        double3 lowerLeftCorner = new double3(targetRealWorldCoordinates.x - (double)(0.5 * boudingBoxDimension), targetRealWorldCoordinates.y - (double)(0.5 * boudingBoxDimension), 0);
-        double3 upperRightCorner = new double3(targetRealWorldCoordinates.x + (double)(0.5 * boudingBoxDimension), targetRealWorldCoordinates.y + (double)(0.5 * boudingBoxDimension), 0);
+        Debug.Log(MyTimer.GetSecondsSiceStartAsString() + ": AnnotationManager determining BoundinBox around detected target");
+
+        double3 lowerLeftCorner = new double3(targetUMLCoordinates.x - (double)(0.5 * boundingBoxDimension), targetUMLCoordinates.y - (double)(0.5 * boundingBoxDimension), 0);
+        double3 upperRightCorner = new double3(targetUMLCoordinates.x + (double)(0.5 * boundingBoxDimension), targetUMLCoordinates.y + (double)(0.5 * boundingBoxDimension), 0);
         BoundingBox boundingBoxAroundTarget = new BoundingBox(lowerLeftCorner, upperRightCorner);
 
-
-        List<BuildingAnnotation> buildingAnnotations = _DatabaseService.GetBuildingAnnotation(boundingBoxAroundTarget);
-        List<SurfaceAnnotation> surfaceAnnotations = _DatabaseService.GetSurfaceAnnotation(boundingBoxAroundTarget);
-        List<FreeWorldAnnotation> freeWorldAnnotations = _DatabaseService.GetFreeWorldAnnotation(boundingBoxAroundTarget);
-
+        // -- BuildingAnnatitions ----------
+        List<BuildingAnnotation> buildingAnnotations = DatabaseService.GetBuildingAnnotation(boundingBoxAroundTarget, buildingsWithinBoundingBox);
 
         foreach (BuildingAnnotation buildingAnnotation in buildingAnnotations)
         {
-            double2 groundSurfaceCenter = buildingAnnotation.BuildingBoundingBox.GetGroundSurfaceCenter();
-            Vector3 unityCoordinates = this.GetUnityCoordinatesArroundTarget(new double3(groundSurfaceCenter.x, groundSurfaceCenter.y, buildingAnnotation.BuildingHeight), targetRealWorldCoordinates);
+            Debug.Log("BuildingAnnotation assiciated with:\n" + buildingAnnotation.AssociatedBuilding.ToString());
 
-            this.CreateOverviewAnnotation(unityCoordinates, buildingAnnotation.AnnotationText, buildingAnnotation.LocalScale);
+            // Falls die BoundingBox des Gebäudes für die BuildingAnnotation unvollständig ist, diese Annotation ignorieren
+            if (buildingAnnotation.AssociatedBuilding.BoundingBox.GetGroundSurfaceCenter().HasValue)
+            {
+                double3 groundSurfaceCenter = buildingAnnotation.AssociatedBuilding.BoundingBox.GetGroundSurfaceCenter().Value;
+                Vector3 unityCoordinates = CoordinateTransformer.GetUnityCoordinatesArroundTarget(new double3(groundSurfaceCenter.x, groundSurfaceCenter.y, groundSurfaceCenter.z + buildingAnnotation.AssociatedBuilding.MeasuredHeight + BuildingAnnotation.meterAboveBuilding), targetUMLCoordinates);
+
+                CreateSimpleTextAnnotation(unityCoordinates, buildingAnnotation.AnnotationProperties, buildingAnnotation.AnnotationComponent);
+            }
+            else
+            {
+                Debug.Log("Cannot determin the gournd surface center of Building with CityGMLID: " + buildingAnnotation.AssociatedBuilding.CityGMLID);
+            }
         }
+
+
+        // -- SurfaceAnnotations ----------
+        Dictionary<string, Surface> surfacesWithinBoundingBox = new Dictionary<string, Surface>();
+        foreach (Building building in buildingsWithinBoundingBox.Values)
+        {
+            foreach (KeyValuePair<string, Surface> surface in building.ExteriorSurfaces)
+            {
+                surfacesWithinBoundingBox.Add(surface.Key, surface.Value);
+            }
+        }
+
+        List<SurfaceAnnotation> surfaceAnnotations = DatabaseService.GetSurfaceAnnotation(boundingBoxAroundTarget, surfacesWithinBoundingBox);
+
+        Debug.Log("Anzahl SurfaceAnnotation innerhalb der BoundingBox: " + surfaceAnnotations.Count);
 
         foreach (SurfaceAnnotation surfaceAnnotation in surfaceAnnotations)
         {
-            double3 fristPoint = surfaceAnnotation.GroundSurfacePoints[0];
-            double3 secondPoint = surfaceAnnotation.GroundSurfacePoints[1];
+            double3 fristBaselinePoint = surfaceAnnotation.AssociatedSurface.Polygon[surfaceAnnotation.AnnotationAnchorPointIndex];
+            double3 secondBaselinePoint = surfaceAnnotation.AssociatedSurface.Polygon[surfaceAnnotation.AnnotationAnchorPointIndex + 1];
 
             // Surface normal pointing behind the annotation
-            Vector3 groundSurfaceBaseLineVector = (float3)(secondPoint - fristPoint);
-            Vector3 annotationToSurfaceDirection = Vector3.Cross((float3) (this.GetLeftHandedCoordinates((Vector3)groundSurfaceBaseLineVector)), Vector3.down).normalized;
+            Vector3 baseLineDirectionVector = (float3)(secondBaselinePoint - fristBaselinePoint);
+            Vector3 unitySurfaceNormal = CoordinateTransformer.GetLeftHandedCoordinates(surfaceAnnotation.AssociatedSurface.GetSurfaceNormal());
+            Vector3 goFromFirstPoint = ((Vector3)(float3)(baseLineDirectionVector) * (float)surfaceAnnotation.RelativePositionBetweenBasePoints);
+            double3 realWorldAnnotationPosition = (fristBaselinePoint + (float3)goFromFirstPoint);
 
-            Debug.Log(fristPoint);
-            Debug.Log(secondPoint);
+            realWorldAnnotationPosition = realWorldAnnotationPosition + (float3)(unitySurfaceNormal.normalized * SurfaceAnnotation.SurfaceOffset);
+            realWorldAnnotationPosition.z += surfaceAnnotation.HeightAboveBaseLine;
 
-            Vector3 goFromFirstPoint = ((Vector3)(float3)(groundSurfaceBaseLineVector) * (float)surfaceAnnotation.RelativeGroundSurfacePosition);
-            double3 realWorldAnnotationPosition = (fristPoint + (float3) goFromFirstPoint);
-            Debug.Log("realWorldAnnotationPosition (left handed): " + realWorldAnnotationPosition.ToString());
-            realWorldAnnotationPosition = realWorldAnnotationPosition + (float3) (annotationToSurfaceDirection.normalized * -1 * surfaceAnnotation.SurfaceOffset);
-            Debug.Log("finalAnnotationPosition: " + realWorldAnnotationPosition.ToString());
-            realWorldAnnotationPosition.z += surfaceAnnotation.Height;
+            Vector3 unityCoordinates = CoordinateTransformer.GetUnityCoordinatesArroundTarget(realWorldAnnotationPosition, targetUMLCoordinates);
 
+            // TODO: falls die Ausrichtung nicht in der CityGML festgelegt wurde, Ausrichtung anhand des Surface
+            if (surfaceAnnotation.AnnotationProperties.PointingDirection.Equals(Vector3.zero))
+            {
+                surfaceAnnotation.AnnotationProperties.PointingDirection = unitySurfaceNormal * -1;
+            }
 
-
-
-
-            Vector3 unityCoordinates = this.GetUnityCoordinatesArroundTarget(realWorldAnnotationPosition, targetRealWorldCoordinates);
-
-
-            this.CreateFocusAnnotation(unityCoordinates, annotationToSurfaceDirection, surfaceAnnotation.AnnotationText, surfaceAnnotation.LocalScale);
+            CreateSimpleTextAnnotation(unityCoordinates, surfaceAnnotation.AnnotationProperties, surfaceAnnotation.AnnotationComponent);
         }
 
-        foreach (FreeWorldAnnotation freeWorldAnnotation in freeWorldAnnotations)
+
+        // -- WorldCoordinateAnnotations ----------
+        List<WorldCoordinateAnnotation> worldCoordinateAnnotations = DatabaseService.GetWorldCoordinateAnnotation(boundingBoxAroundTarget);
+
+        foreach (WorldCoordinateAnnotation worldCoordinateAnnotation in worldCoordinateAnnotations)
         {
-            Vector3 unityCoordinates = this.GetUnityCoordinatesArroundTarget(freeWorldAnnotation.RealWorldCoordinate, targetRealWorldCoordinates);
-
-            this.CreateOverviewAnnotation(unityCoordinates, freeWorldAnnotation.AnnotationText, freeWorldAnnotation.LocalScale);
+            Vector3 unityCoordinates = CoordinateTransformer.GetUnityCoordinatesArroundTarget(worldCoordinateAnnotation.AnnotationUMLCoordinates, targetUMLCoordinates);
+            CreateSimpleTextAnnotation(unityCoordinates, worldCoordinateAnnotation.AnnotationProperties, worldCoordinateAnnotation.AnnotationComponent);
         }
-
-
-
-
-
 
         /*
-
                 // Overview Annotation
                 Vector3 unityCoordinates_Seminarraum1 = this.GetUnityCoordinatesArroundTarget(new double3(33310196.666, 5995821.237, 49), targetRealWorldCoordinates);
                 this.CreateOverviewAnnotation(unityCoordinates_Seminarraum1, "↓ Seminarraum 1");
@@ -95,9 +114,7 @@ public class AnnotationManager : CityGMLFactory
                 Vector3 unityCoordinates_focus = this.GetUnityCoordinatesArroundTarget(targetRealWorldCoordinates, targetRealWorldCoordinates);
                 unityCoordinates_focus = new Vector3(unityCoordinates_focus.x, unityCoordinates_focus.y + 0.1f, unityCoordinates_focus.z);
                 Vector3 annotationPointingDirection = new Vector3(1,0,0);
-                this.CreateFocusAnnotation(unityCoordinates_focus, annotationPointingDirection, "WallAnnotation");
-
-
+                this.CreateFocusAnnotation(unityCoordinates_focus, annotationPointingDirection, "WallAnnotation
         */
 
         Debug.Log(MyTimer.GetSecondsSiceStartAsString() + ": Creating Annotations around target succeeded");
@@ -105,38 +122,81 @@ public class AnnotationManager : CityGMLFactory
     }
 
 
+
+    private void CreateSimpleTextAnnotation(Vector3 position, AnnotationProperties annotationProperties, AnnotationComponent annotationComponent)
+    {
+        switch (annotationComponent)
+        {
+            case TextAnnotationComponent annotationTextComponent:
+
+                annotationTextComponent = (TextAnnotationComponent)annotationComponent;
+
+                // Create new SimpleTextAnnotation GameObject from AnnotationPrefab
+                GameObject annotationGameObject = Instantiate(AnnotationPrefab, new Vector3(0, 0.1f, 0), Quaternion.identity);
+                annotationGameObject.transform.parent = transform;
+                AnnotationPrefabScript annotationPrefabScript = (AnnotationPrefabScript)annotationGameObject.GetComponent(typeof(AnnotationPrefabScript));
+
+                annotationPrefabScript.SetAnnotationText(annotationTextComponent.Text);
+                annotationPrefabScript.SetLocalScale(annotationTextComponent.TextSize);
+
+                // Apply AnnotationProperties
+                annotationGameObject.transform.position = position;
+                if (annotationProperties.PointingDirection.Equals(Vector3.zero))
+                {
+                    annotationPrefabScript.SetLookToARCamera(true);
+                }
+                else
+                {
+                    annotationPrefabScript.SetLookToARCamera(false);
+                    annotationGameObject.transform.rotation = Quaternion.LookRotation(new Vector3((float)annotationProperties.PointingDirection.x, (float)annotationProperties.PointingDirection.y, (float)annotationProperties.PointingDirection.z));
+                }
+                annotationPrefabScript.SetScaleWithARCameraDistance(annotationProperties.ScaleWithCameraDistance);
+
+
+                break;
+
+            default: throw new NotImplementedException();
+        }
+
+
+
+
+
+    }
+
+
     private void CreateOverviewAnnotation(Vector3 position, string annotationText, float localScale)
     {
-        (GameObject annotationGameObject, Annotation annotation) = this.CreateAnnotationGameObject(annotationText, localScale);
+        (GameObject annotationGameObject, AnnotationPrefabScript annotationPrefabScript) = CreateAnnotationGameObject(annotationText, localScale);
         annotationGameObject.transform.position = position;
-        annotation.SetLookToARCamera(true);
-        annotation.SetScaleWithARCameraDistance(true);
+        annotationPrefabScript.SetLookToARCamera(true);
+        annotationPrefabScript.SetScaleWithARCameraDistance(true);
     }
 
 
     private void CreateFocusAnnotation(Vector3 position, Vector3 pointingDirection, string annotationText, float localScale)
     {
-        (GameObject annotationGameObject, Annotation annotation) = this.CreateAnnotationGameObject(annotationText, localScale);
+        (GameObject annotationGameObject, AnnotationPrefabScript annotationPrefabScript) = CreateAnnotationGameObject(annotationText, localScale);
         annotationGameObject.transform.position = position;
         annotationGameObject.transform.rotation = Quaternion.LookRotation(pointingDirection);
     }
 
 
-    public (GameObject, Annotation) CreateAnnotationGameObject(string annotationText, float localScale)
+    public (GameObject, AnnotationPrefabScript) CreateAnnotationGameObject(string annotationText, float localScale)
     {
         GameObject annotationGameObject = Instantiate(AnnotationPrefab, new Vector3(0, 0.1f, 0), Quaternion.identity);
-        annotationGameObject.transform.parent = this.transform;
-        Annotation annotation = (Annotation)annotationGameObject.GetComponent(typeof(Annotation));
+        annotationGameObject.transform.parent = transform;
+        AnnotationPrefabScript nnotationPrefabScript = (AnnotationPrefabScript)annotationGameObject.GetComponent(typeof(AnnotationPrefabScript));
 
-        annotation.SetAnnotationText(annotationText);
-        annotation.SetLocalScale(localScale);
+        nnotationPrefabScript.SetAnnotationText(annotationText);
+        nnotationPrefabScript.SetLocalScale(localScale);
 
-        return (annotationGameObject, annotation);
+        return (annotationGameObject, nnotationPrefabScript);
     }
 
     public void UpdateAnnotationAnchor(Vector3 trackedImagePosition, Quaternion trackedImageRotation)
     {
-        this.transform.position = trackedImagePosition;
-        this.transform.rotation = trackedImageRotation;
+        transform.position = trackedImagePosition;
+        transform.rotation = trackedImageRotation;
     }
 }
